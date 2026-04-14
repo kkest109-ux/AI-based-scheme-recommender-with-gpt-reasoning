@@ -1,6 +1,6 @@
 # AI Scheme Recommender
 
-A simple browser-based recommender for Indian government schemes.
+Browser based intelligent recommendation system using Sentence-BERT for semantic matching and a rule-based engine for eligibility checks (age, income, occupation). Integrates LLMs for explainable decisions and uses a hybrid scoring method. Built with Python and Streamlit for real-time, scalable performance.
 
 ## Files
 
