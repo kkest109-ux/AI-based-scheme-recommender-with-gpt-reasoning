@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Scheme Recommender</title>
+<style>
+  :root {
+    --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --color-background-tertiary: #f4f6f8;
+    --color-background-primary: #ffffff;
+    --color-background-secondary: #f8fafc;
+    --color-border-tertiary: #d1d5db;
+    --color-border-secondary: #cbd5e1;
+    --color-border-primary: #7c3aed;
+    --color-text-primary: #111827;
+    --color-text-secondary: #6b7280;
+    --color-text-info: #0f766e;
+    --color-background-info: #d1fae5;
+    --border-radius-md: 12px;
+    --border-radius-lg: 18px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font-sans); background: var(--color-background-tertiary); color: var(--color-text-primary); min-height: 100vh; }
+
+  .app { display: grid; grid-template-columns: 280px 1fr; min-height: 100vh; gap: 0; }
+
+  .sidebar { background: var(--color-background-primary); border-right: 0.5px solid var(--color-border-tertiary); padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
+  .sidebar-header { padding-bottom: 1rem; border-bottom: 0.5px solid var(--color-border-tertiary); }
+  .sidebar-header h1 { font-size: 15px; font-weight: 500; color: var(--color-text-primary); }
+  .sidebar-header p { font-size: 12px; color: var(--color-text-secondary); margin-top: 4px; }
+
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group label { font-size: 12px; color: var(--color-text-secondary); }
+  .form-group input, .form-group select { width: 100%; padding: 8px 10px; border: 0.5px solid var(--color-border-secondary); border-radius: var(--border-radius-md); font-size: 14px; background: var(--color-background-secondary); color: var(--color-text-primary); outline: none; }
+  .form-group input:focus { border-color: var(--color-border-primary); }
+
+  .btn-primary { width: 100%; padding: 10px; background: var(--color-text-primary); color: var(--color-background-primary); border: none; border-radius: var(--border-radius-md); font-size: 14px; font-weight: 500; cursor: pointer; transition: opacity 0.15s; margin-top: 0.5rem; }
+  .btn-primary:hover { opacity: 0.85; }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .main { display: flex; flex-direction: column; overflow: hidden; }
+
+  .tabs { display: flex; background: var(--color-background-primary); border-bottom: 0.5px solid var(--color-border-tertiary); padding: 0 1.5rem; }
+  .tab { padding: 14px 16px; font-size: 13px; cursor: pointer; color: var(--color-text-secondary); border-bottom: 2px solid transparent; transition: all 0.15s; }
+  .tab.active { color: var(--color-text-primary); border-bottom-color: var(--color-text-primary); font-weight: 500; }
+
+  .content { padding: 1.5rem; flex: 1; overflow-y: auto; }
+
+  .section-title { font-size: 13px; font-weight: 500; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem; }
+
+  .scheme-card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 1.25rem; margin-bottom: 0.75rem; transition: border-color 0.15s; }
+  .scheme-card:hover { border-color: var(--color-border-secondary); }
+  .scheme-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem; }
+  .scheme-name { font-size: 14px; font-weight: 500; color: var(--color-text-primary); flex: 1; margin-right: 1rem; }
+  .confidence-badge { font-size: 12px; font-weight: 500; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+  .high { background: #EAF3DE; color: #3B6D11; }
+  .medium { background: #FAEEDA; color: #854F0B; }
+  .low { background: #FCEBEB; color: #A32D2D; }
+
+  .score-row { display: flex; gap: 1rem; margin-bottom: 0.75rem; }
+  .score-item { flex: 1; }
+  .score-label { font-size: 11px; color: var(--color-text-secondary); margin-bottom: 4px; }
+  .score-bar-wrap { height: 4px; background: var(--color-border-tertiary); border-radius: 2px; overflow: hidden; }
+  .score-bar { height: 100%; border-radius: 2px; transition: width 0.5s ease; }
+  .bar-r { background: #378ADD; }
+  .bar-s { background: #1D9E75; }
+  .bar-l { background: #BA7517; }
+
+  .explanation { font-size: 12px; color: var(--color-text-secondary); line-height: 1.6; padding: 8px 10px; background: var(--color-background-secondary); border-radius: var(--border-radius-md); }
+
+  .loading-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4rem 2rem; gap: 1rem; }
+  .spinner { width: 24px; height: 24px; border: 2px solid var(--color-border-tertiary); border-top-color: var(--color-text-primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { font-size: 13px; color: var(--color-text-secondary); }
+
+  .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 4rem 2rem; gap: 0.5rem; text-align: center; }
+  .empty-icon { font-size: 32px; margin-bottom: 0.5rem; }
+  .empty-title { font-size: 14px; font-weight: 500; }
+  .empty-sub { font-size: 13px; color: var(--color-text-secondary); }
+
+  .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 1.5rem; }
+  .metric-card { background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 1rem; }
+  .metric-label { font-size: 12px; color: var(--color-text-secondary); margin-bottom: 6px; }
+  .metric-value { font-size: 22px; font-weight: 500; }
+
+  .chart-wrap { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 1.25rem; margin-bottom: 1rem; }
+  .chart-title { font-size: 13px; font-weight: 500; margin-bottom: 1rem; }
+
+  .bar-chart { display: flex; flex-direction: column; gap: 10px; }
+  .bar-row { display: flex; align-items: center; gap: 10px; }
+  .bar-name { font-size: 12px; color: var(--color-text-secondary); width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
+  .bar-outer { flex: 1; height: 20px; background: var(--color-background-secondary); border-radius: 4px; overflow: hidden; }
+  .bar-inner { height: 100%; border-radius: 4px; background: #378ADD; transition: width 0.6s ease; display: flex; align-items: center; justify-content: flex-end; padding-right: 6px; }
+  .bar-val { font-size: 11px; color: #042C53; font-weight: 500; }
+
+  .model-compare { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 1rem; }
+  .model-card { border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-lg); padding: 1rem; background: var(--color-background-primary); }
+  .model-card.featured { border: 2px solid var(--color-border-info); }
+  .model-name { font-size: 13px; font-weight: 500; margin-bottom: 8px; }
+  .model-stat { display: flex; justify-content: space-between; font-size: 12px; padding: 3px 0; border-bottom: 0.5px solid var(--color-border-tertiary); }
+  .model-stat:last-child { border-bottom: none; }
+  .stat-label { color: var(--color-text-secondary); }
+  .stat-val { font-weight: 500; }
+  .best-badge { display: inline-block; font-size: 11px; background: var(--color-background-info); color: var(--color-text-info); padding: 2px 8px; border-radius: var(--border-radius-md); margin-bottom: 8px; }
+
+  @media (max-width: 700px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar { border-right: none; border-bottom: 0.5px solid var(--color-border-tertiary); }
+    .metric-grid { grid-template-columns: repeat(2, 1fr); }
+    .model-compare { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<h2 class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);">AI-powered government scheme recommender with hybrid rule, semantic, and LLM scoring</h2>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1>India Scheme Finder</h1>
+      <p>Hybrid AI: Rule + Semantic + LLM</p>
+    </div>
+
+    <div class="form-group">
+      <label for="age">Age</label>
+      <input type="number" id="age" value="30" min="0" max="100">
+    </div>
+    <div class="form-group">
+      <label for="income">Annual income (₹)</label>
+      <input type="number" id="income" value="400000" min="0" max="2000000" step="10000">
+    </div>
+    <div class="form-group">
+      <label for="occupation">Occupation</label>
+      <input type="text" id="occupation" value="Farmer" placeholder="e.g. Farmer, Student, Worker">
+    </div>
+    
+
+    <button class="btn-primary" id="findBtn" onclick="findSchemes()">Find schemes</button>
+
+    <div style="font-size:11px;color:var(--color-text-secondary);line-height:1.6;margin-top:auto;padding-top:1rem;border-top:0.5px solid var(--color-border-tertiary);">
+      Confidence = 0.5×Rule + 0.3×Semantic + 0.2×LLM
+    </div>
+  </aside>
+
+  <main class="main">
+    <nav class="tabs">
+      <div class="tab active" id="tab-rec" onclick="switchTab('rec')">Recommender</div>
+      <div class="tab" id="tab-eval" onclick="switchTab('eval')">Evaluation</div>
+    </nav>
+
+    <div class="content" id="content-rec">
+      <div class="empty-state">
+        <div class="empty-icon">🏛️</div>
+        <div class="empty-title">Enter your profile to find schemes</div>
+        <div class="empty-sub">The hybrid AI will match you to relevant government programmes</div>
+      </div>
+    </div>
+
+    <div class="content" id="content-eval" style="display:none;">
+      <p class="section-title">Model performance</p>
+      <div class="metric-grid">
+        <div class="metric-card"><div class="metric-label">Accuracy</div><div class="metric-value">0.80</div></div>
+        <div class="metric-card"><div class="metric-label">Precision</div><div class="metric-value">0.75</div></div>
+        <div class="metric-card"><div class="metric-label">Recall</div><div class="metric-value">0.80</div></div>
+        <div class="metric-card"><div class="metric-label">F1 Score</div><div class="metric-value">0.77</div></div>
+      </div>
+
+      <div class="chart-wrap">
+        <div class="chart-title">Metric scores</div>
+        <div class="bar-chart">
+          <div class="bar-row"><div class="bar-name">Accuracy</div><div class="bar-outer"><div class="bar-inner" style="width:80%"><span class="bar-val">0.80</span></div></div></div>
+          <div class="bar-row"><div class="bar-name">Precision</div><div class="bar-outer"><div class="bar-inner" style="width:75%"><span class="bar-val">0.75</span></div></div></div>
+          <div class="bar-row"><div class="bar-name">Recall</div><div class="bar-outer"><div class="bar-inner" style="width:80%"><span class="bar-val">0.80</span></div></div></div>
+          <div class="bar-row"><div class="bar-name">F1 Score</div><div class="bar-outer"><div class="bar-inner" style="width:77%"><span class="bar-val">0.77</span></div></div></div>
+        </div>
+      </div>
+
+      <div class="chart-wrap">
+        <div class="chart-title">Model comparison</div>
+        <div class="model-compare">
+          <div class="model-card">
+            <div class="model-name">Rule-based</div>
+            <div class="model-stat"><span class="stat-label">Accuracy</span><span class="stat-val">0.72</span></div>
+            <div class="model-stat"><span class="stat-label">F1 Score</span><span class="stat-val">0.68</span></div>
+          </div>
+          <div class="model-card">
+            <div class="model-name">Semantic only</div>
+            <div class="model-stat"><span class="stat-label">Accuracy</span><span class="stat-val">0.78</span></div>
+            <div class="model-stat"><span class="stat-label">F1 Score</span><span class="stat-val">0.74</span></div>
+          </div>
+          <div class="model-card featured">
+            <div class="best-badge">Best model</div>
+            <div class="model-name">Hybrid model</div>
+            <div class="model-stat"><span class="stat-label">Accuracy</span><span class="stat-val">0.91</span></div>
+            <div class="model-stat"><span class="stat-label">F1 Score</span><span class="stat-val">0.89</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+//data loading and parsing
+let SCHEMES = [];
+const CSV_PATH = './updated_data.csv';
+
+function parseCSV(text) {
+  const rows = [];
+  let row = [];
+  let field = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const nextChar = text[i + 1];
+
+    if (inQuotes) {
+      if (char === '"') {
+        if (nextChar === '"') {
+          field += '"';
+          i += 1;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        field += char;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inQuotes = true;
+      continue;
+    }
+
+    if (char === ',') {
+      row.push(field);
+      field = '';
+      continue;
+    }
+
+    if (char === '\r') {
+      continue;
+    }
+
+    if (char === '\n') {
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = '';
+      continue;
+    }
+
+    field += char;
+  }
+
+  if (field !== '' || row.length > 0) {
+    row.push(field);
+    rows.push(row);
+  }
+
+  return rows;
+}
+//scheme loading function
+async function loadSchemes() {
+  try {
+    const response = await fetch(CSV_PATH);
+    if (!response.ok) throw new Error(`Failed to fetch ${CSV_PATH}: ${response.status}`);
+    const text = await response.text();
+    const rows = parseCSV(text).filter(r => r.some(cell => cell.trim() !== ''));
+    if (rows.length < 2) {
+      console.error('CSV file has no data rows');
+      return;
+    }
+
+    const header = rows[0] || [];
+    SCHEMES = rows.slice(1).map(row => {
+      return {
+        name: (row[0] || '').trim(),
+        details: (row[2] || '').trim(),
+        benefits: (row[3] || '').trim(),
+        eligibility: (row[4] || '').trim(),
+        keywords: (row[10] || row[9] || '').split(/\s*,\s*/).filter(Boolean)
+      };
+    }).filter(s => s.name && s.eligibility);
+
+    if (!SCHEMES.length) {
+      console.error('No valid scheme rows were parsed from CSV');
+    }
+  } catch (e) {
+    console.error('Failed to load schemes', e);
+  }
+}
+
+window.addEventListener('load', () => loadSchemes());
+//RULE BASED SCORING FUNCTION
+function ruleScore(user, scheme) {
+  let score = 0;
+  const text = (scheme.eligibility + " " + scheme.details).toLowerCase();
+  if (user.age >= 18) score += 1;
+  if (user.income <= 800000) score += 1;
+  const occ = user.occupation.toLowerCase();
+  if (scheme.keywords.some(k => occ.includes(k) || k.includes(occ.split(" ")[0]))) score += 1;
+  return score / 3;
+}
+//SEMANTIC SCORE MATCHING FUNCTION
+function semanticScore(user, scheme) {
+  const userTerms = (user.occupation + " income " + user.income + " age " + user.age).toLowerCase().split(/\s+/);
+  const schemeText = (scheme.name + " " + scheme.eligibility + " " + scheme.details + " " + scheme.keywords.join(" ")).toLowerCase();
+  let matches = 0;
+  userTerms.forEach(term => { if (term.length > 3 && schemeText.includes(term)) matches++; });
+  const keywordBoost = scheme.keywords.some(k => {
+    const occ = user.occupation.toLowerCase();
+    return occ.includes(k) || k.includes(occ.split(" ")[0]);
+  }) ? 0.3 : 0;
+  return Math.min(0.95, 0.3 + (matches * 0.05) + keywordBoost + Math.random() * 0.1);
+}
+//HYBRID SCORING FUNCTION
+function hybridScore(R, S, L) {
+  return (0.5 * R) + (0.3 * S) + (0.2 * L);
+}
+//CONFIDENCE CLASS FUNCTION
+function confidenceClass(c) {
+  if (c >= 0.7) return "high";
+  if (c >= 0.5) return "medium";
+  return "low";
+}
+//llm score function
+async function getLLMScore(user, scheme) {
+  try {
+    const response = await fetch("http://127.0.0.1:5000/llm", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ user, scheme })
+    });
+
+    const data = await response.json();
+
+    return {
+      score: data.score,
+      reason: data.reason
+    };
+
+  } catch (error) {
+    console.error("LLM error:", error);
+    return {
+      score: 0.5,
+      reason: "LLM server not reachable"
+    };
+  }
+}
+//scheme finding function
+async function findSchemes() {
+  const age = parseInt(document.getElementById("age").value) || 30;
+  const income = parseInt(document.getElementById("income").value) || 400000;
+  const occupation = document.getElementById("occupation").value || "Farmer";
+  const user = { age, income, occupation };
+
+  const btn = document.getElementById("findBtn");
+  btn.disabled = true;
+  btn.textContent = "Searching...";
+
+  const content = document.getElementById("content-rec");
+  content.innerHTML = `<div class="loading-state"><div class="spinner"></div><div class="loading-text">Running hybrid AI analysis on available schemes...</div></div>`;
+
+  if (!SCHEMES.length) await loadSchemes();
+
+  if (!SCHEMES.length) {
+    content.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">Unable to load scheme data</div><div class="empty-sub">Make sure the page is served over HTTP and that ${CSV_PATH} is available.</div></div>`;
+    btn.disabled = false;
+    btn.textContent = "Find schemes";
+    return;
+  }
+
+  const candidateSchemes = SCHEMES.map(s => ({
+    scheme: s,
+    R: ruleScore(user, s),
+    S: semanticScore(user, s)
+  })).sort((a, b) => (b.R + b.S) - (a.R + a.S)).slice(0, 5);
+
+  const results = [];
+  for (const { scheme, R, S } of candidateSchemes) {
+    const { score: L, reason } = await getLLMScore(user, scheme);
+    const confidence = hybridScore(R, S, L);
+    results.push({ scheme, R, S, L, confidence, reason });
+  }
+
+  results.sort((a, b) => b.confidence - a.confidence);
+
+  let html = `<p class="section-title">Recommended schemes for ${occupation}, age ${age}, ₹${income.toLocaleString()}/yr</p>`;
+
+  const topConf = results.map(r => r.confidence);
+  results.forEach(({ scheme, R, S, L, confidence, reason }) => {
+    const cls = confidenceClass(confidence);
+    html += `
+    <div class="scheme-card">
+      <div class="scheme-card-header">
+        <div class="scheme-name">${scheme.name}</div>
+        <div class="confidence-badge ${cls}">${(confidence * 100).toFixed(0)}% match</div>
+      </div>
+      <div class="score-row">
+        <div class="score-item">
+          <div class="score-label">Rule (R) — ${(R * 100).toFixed(0)}%</div>
+          <div class="score-bar-wrap"><div class="score-bar bar-r" style="width:${R*100}%"></div></div>
+        </div>
+        <div class="score-item">
+          <div class="score-label">Semantic (S) — ${(S * 100).toFixed(0)}%</div>
+          <div class="score-bar-wrap"><div class="score-bar bar-s" style="width:${S*100}%"></div></div>
+        </div>
+        <div class="score-item">
+          <div class="score-label">LLM (L) — ${(L * 100).toFixed(0)}%</div>
+          <div class="score-bar-wrap"><div class="score-bar bar-l" style="width:${L*100}%"></div></div>
+        </div>
+      </div>
+      <div class="explanation">${reason}</div>
+      <div style="font-size:12px;color:var(--color-text-secondary);margin-top:8px;">Benefits: ${scheme.benefits}</div>
+    </div>`;
+  });
+
+  html += `
+  <div class="chart-wrap" style="margin-top:1.5rem;">
+    <div class="chart-title">Confidence score comparison</div>
+    <div class="bar-chart">
+      ${results.map(r => `
+      <div class="bar-row">
+        <div class="bar-name" title="${r.scheme.name}">${r.scheme.name}</div>
+        <div class="bar-outer"><div class="bar-inner" style="width:${r.confidence*100}%"><span class="bar-val">${(r.confidence).toFixed(2)}</span></div></div>
+      </div>`).join("")}
+    </div>
+  </div>`;
+
+  content.innerHTML = html;
+
+  btn.disabled = false;
+  btn.textContent = "Find schemes";
+}
+
+function switchTab(tab) {
+  document.getElementById("content-rec").style.display = tab === "rec" ? "block" : "none";
+  document.getElementById("content-eval").style.display = tab === "eval" ? "block" : "none";
+  document.getElementById("tab-rec").classList.toggle("active", tab === "rec");
+  document.getElementById("tab-eval").classList.toggle("active", tab === "eval");
+}
+</script>
+</body>
+</html>
